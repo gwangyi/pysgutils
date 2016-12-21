@@ -503,7 +503,7 @@ def sg_set_warnings_strm(fd):
         raise OSError(errno, libc.strerror(errno).decode('utf-8'))
 
     libc.setbuf(strm, None)
-    libsgutils2.sg_set_warning_strm(strm)
+    libsgutils2.sg_set_warnings_strm(strm)
 
 
 def sg_print_command(command):
