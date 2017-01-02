@@ -31,7 +31,7 @@ import six
 import ctypes
 import struct
 import enum
-from . import libsgutils2, libc
+from . import libsgutils2, libc, _impl_check
 
 
 @six.python_2_unicode_compatible
@@ -136,6 +136,7 @@ def sg_lib_version():
     return libsgutils2.sg_lib_version().decode('utf-8')
 
 
+@_impl_check
 def sg_get_command_size(cdb_byte0):
     """
     Returns length of SCSI command given the opcode (first byte).
@@ -148,6 +149,7 @@ def sg_get_command_size(cdb_byte0):
     return libsgutils2.sg_get_command_size(cdb_byte0_)
 
 
+@_impl_check
 def sg_get_command_name(cdb, peri_type):
     """
     Command name given pointer to the cdb. Certain command names
@@ -159,6 +161,7 @@ def sg_get_command_name(cdb, peri_type):
     return buff.value.decode('utf-8')
 
 
+@_impl_check
 def sg_get_opcode_name(cdb_byte0, peri_type):
     """
     Command name given only the first byte (byte 0) of a cdb and
@@ -173,6 +176,7 @@ def sg_get_opcode_name(cdb_byte0, peri_type):
     return buff.value.decode('utf-8')
 
 
+@_impl_check
 def sg_get_opcode_sa_name(cdb_byte0, service_action, peri_type):
     """
     Command name given opcode (byte 0), service action and peripheral type.
@@ -187,6 +191,7 @@ def sg_get_opcode_sa_name(cdb_byte0, service_action, peri_type):
     return buff.value.decode('utf-8')
 
 
+@_impl_check
 def sg_get_scsi_status_str(scsi_status):
     """ Fetch scsi status string. """
     buff = ctypes.create_string_buffer(128)
@@ -214,6 +219,7 @@ class SCSISenseHdr:
         self.additional_length = additional_length
 
 
+@_impl_check
 def sg_scsi_normalize_sense(sense):
     """
     Maps the salient data from a sense buffer which is in either fixed or
@@ -234,6 +240,7 @@ def sg_scsi_normalize_sense(sense):
                             byte4=byte4, byte5=byte5, byte6=byte6, additional_length=additional_length)
 
 
+@_impl_check
 def sg_scsi_sense_desc_find(sense, desc_type):
     """
     Attempt to find the first SCSI sense data descriptor that matches the
@@ -248,6 +255,7 @@ def sg_scsi_sense_desc_find(sense, desc_type):
         return sense[ret - ctypes.addressof(buffer):]
 
 
+@_impl_check
 def sg_get_sense_key(sense):
     """
     Get sense key from sense buffer. If successful returns a sense key value
@@ -263,6 +271,7 @@ def sg_get_sense_key(sense):
             return ret
 
 
+@_impl_check
 def sg_get_sense_key_str(sense_key):
     """ Yield string associated with sense_key value. Returns 'buff'. """
     buff = ctypes.create_string_buffer(80)
@@ -270,6 +279,7 @@ def sg_get_sense_key_str(sense_key):
     return buff.value.decode('utf-8')
 
 
+@_impl_check
 def sg_get_asc_ascq_str(asc, ascq):
     """ Yield string associated with ASC/ASCQ values. Returns 'buff'. """
     buff = ctypes.create_string_buffer(128)
@@ -277,6 +287,7 @@ def sg_get_asc_ascq_str(asc, ascq):
     return buff.value.decode('utf-8')
 
 
+@_impl_check
 def sg_get_sense_info_fld(sense):
     """
     Returns 1 if valid bit set, 0 if valid bit clear. Irrespective the
@@ -288,6 +299,7 @@ def sg_get_sense_info_fld(sense):
     return ret, info.value
 
 
+@_impl_check
 def sg_get_sense_filemark_eom_ili(sense):
     """
     Returns 1 if any of the 3 bits (i.e. FILEMARK, EOM or ILI) are set.
@@ -304,6 +316,7 @@ def sg_get_sense_filemark_eom_ili(sense):
     return ret, filemark.value != 0, eom.value != 0, ili.value != 0
 
 
+@_impl_check
 def sg_get_sense_progress_fld(sense):
     """
     Returns 1 if SKSV is set and sense key is NO_SENSE or NOT_READY. Also
@@ -318,6 +331,7 @@ def sg_get_sense_progress_fld(sense):
     return ret, progress.value
 
 
+@_impl_check
 def sg_get_sense_str(leadin, sense, raw_sinfo):
     """
     Closely related to sg_print_sense(). Puts decoded sense data in 'buff'.
@@ -337,6 +351,7 @@ def sg_get_sense_str(leadin, sense, raw_sinfo):
     return buff[:ret].decode('utf-8')
 
 
+@_impl_check
 def sg_get_sense_descriptors_str(leadin, sense):
     """
     Decode descriptor format sense descriptors (assumes sense buffer is
@@ -353,6 +368,7 @@ def sg_get_sense_descriptors_str(leadin, sense):
     return buff[:ret].decode('utf-8')
 
 
+@_impl_check
 def sg_get_designation_descriptor_str(leadin, ddp, print_assoc=False, do_long=False):
     """
     Decodes a designation descriptor (e.g. as found in the Device
@@ -371,6 +387,7 @@ def sg_get_designation_descriptor_str(leadin, ddp, print_assoc=False, do_long=Fa
     return buff[:ret].decode('utf-8')
 
 
+@_impl_check
 def sg_get_pdt_str(pdt):
     """
     Yield string associated with peripheral device type (pdt). Returns
@@ -381,6 +398,7 @@ def sg_get_pdt_str(pdt):
     return buff.value.decode('utf-8')
 
 
+@_impl_check
 def sg_lib_pdt_decay(pdt):
     """
     Some lesser used PDTs share a lot in common with a more used PDT.
@@ -392,6 +410,7 @@ def sg_lib_pdt_decay(pdt):
     return PeripheralDeviceTypes(libsgutils2.sg_lib_pdt_decay(pdt))
 
 
+@_impl_check
 def sg_get_trans_proto_str(tpi):
     """
     Yield string associated with transport protocol identifier (tpi). Returns
@@ -402,6 +421,7 @@ def sg_get_trans_proto_str(tpi):
     return buff.value.decode('utf-8')
 
 
+@_impl_check
 def sg_decode_transportid_str(leadin, bp, only_one=True):
     """
     Decode TransportID pointed to by 'bp' of length 'bplen'. Place decoded
@@ -436,6 +456,7 @@ class DesignatorType(enum.IntEnum):
         return sg_get_desig_type_str(self)
 
 
+@_impl_check
 def sg_get_desig_type_str(val):
     """
     Returns a designator's type string given 'val' (0 to 15 inclusive),
@@ -455,6 +476,7 @@ class DesignatorCodeSet(enum.IntEnum):
         return sg_get_desig_code_set_str(self)
 
 
+@_impl_check
 def sg_get_desig_code_set_str(val):
     """
     Returns a designator's code_set string given 'val' (0 to 15 inclusive),
@@ -474,6 +496,7 @@ class DesignatorAssociation(enum.IntEnum):
         return sg_get_desig_assoc_str(self)
 
 
+@_impl_check
 def sg_get_desig_assoc_str(val):
     """
     Returns a designator's association string given 'val' (0 to 3 inclusive),
@@ -483,6 +506,7 @@ def sg_get_desig_assoc_str(val):
     return None if ret is None else ret.decode('utf-8')
 
 
+@_impl_check
 def sg_set_warnings_strm(fd):
     if hasattr(fd, 'fileno'):
         fd_ = fd.fileno()
@@ -504,6 +528,7 @@ def sg_set_warnings_strm(fd):
     libsgutils2.sg_set_warnings_strm(strm)
 
 
+@_impl_check
 def sg_print_command(command):
     """
     The following "print" functions send ACSII to 'sg_warnings_strm' file
@@ -513,6 +538,7 @@ def sg_print_command(command):
     libsgutils2.sg_print_command(command)
 
 
+@_impl_check
 def sg_print_scsi_status(scsi_status):
     """
     The following "print" functions send ACSII to 'sg_warnings_strm' file
@@ -522,6 +548,7 @@ def sg_print_scsi_status(scsi_status):
     libsgutils2.sg_print_scsi_status(scsi_status)
 
 
+@_impl_check
 def sg_print_sense(leadin, sense_buffer, raw_info=False):
     """
     'leadin' is string prepended to each line printed out, NULL treated as
@@ -643,6 +670,7 @@ class SGLibCategory(enum.IntEnum):
         return sg_get_category_sense_str(self)
 
 
+@_impl_check
 def sg_err_category_sense(sense_buffer):
     """
     Returns a SG_LIB_CAT_* value. If cannot decode sense_buffer or a less
@@ -654,6 +682,7 @@ def sg_err_category_sense(sense_buffer):
     return SGLibCategory(libsgutils2.sg_err_category_sense(sense_buffer_, sb_len))
 
 
+@_impl_check
 def sg_get_category_sense_str(sense_cat, verbose=False):
     """
      Yield string associated with sense category. Returns 'buff' (or pointer
@@ -665,6 +694,7 @@ def sg_get_category_sense_str(sense_cat, verbose=False):
     return buff.value.decode('utf-8')
 
 
+@_impl_check
 def sg_vpd_dev_id_iter(initial_desig_desc, m_assoc=None, m_desig_type=None, m_codeset=None):
     """
     Iterates to next designation descriptor in the device identification
@@ -702,6 +732,7 @@ def sg_vpd_dev_id_iter(initial_desig_desc, m_assoc=None, m_desig_type=None, m_co
 # <<< General purpose (i.e. not SCSI specific) utility functions >>>
 
 
+@_impl_check
 def safe_strerror(errnum):
     """
     Always returns valid string even if errnum is wild (or library problem).
@@ -718,6 +749,7 @@ class StrHexFormat(enum.IntEnum):
     Hdparm = -2
 
 
+@_impl_check
 def dStrHex(str, no_ascii=StrHexFormat.WithAscii):
     """
     Print (to stdout) 'str' of bytes in hex, 16 bytes per line optionally
@@ -732,6 +764,7 @@ def dStrHex(str, no_ascii=StrHexFormat.WithAscii):
     libsgutils2.dStrHex(str_, len(str_), no_ascii)
 
 
+@_impl_check
 def dStrHexErr(str, no_ascii=StrHexFormat.WithAscii):
     """
     Print (to sg_warnings_strm (stderr)) 'str' of bytes in hex, 16 bytes per
@@ -742,6 +775,7 @@ def dStrHexErr(str, no_ascii=StrHexFormat.WithAscii):
     libsgutils2.dStrHexErr(str_, len(str_), no_ascii)
 
 
+@_impl_check
 def dStrHexStr(str, leadin=None, format=StrHexFormat.WithAscii):
     """
     Read 'len' bytes from 'str' and output as ASCII-Hex bytes (space
@@ -762,6 +796,7 @@ def dStrHexStr(str, leadin=None, format=StrHexFormat.WithAscii):
     return buff.value[:b_len]
 
 
+@_impl_check
 def sg_is_big_endian():
     """
     Returns 1 when executed on big endian machine; else returns 0.
@@ -771,6 +806,7 @@ def sg_is_big_endian():
     return libsgutils2.sg_is_big_endian()
 
 
+@_impl_check
 def sg_ata_get_chars(word_arr, is_big_endian=None):
     """
     Extract character sequence from ATA words as in the model string
@@ -788,6 +824,7 @@ def sg_ata_get_chars(word_arr, is_big_endian=None):
     return buff[:ret].decode('utf-8')
 
 
+@_impl_check
 def dWordHex(words, no_ascii=StrHexFormat.WithAscii, swapb=None):
     """
     Print (to stdout) 16 bit 'words' in hex, 8 words per line optionally
@@ -810,18 +847,22 @@ def dWordHex(words, no_ascii=StrHexFormat.WithAscii, swapb=None):
     libsgutils2.dWordHex(words_, len(words), no_ascii, swapb)
 
 
+@_impl_check
 def sg_get_num(buf):
     return libsgutils2.sg_get_num(buf.encode('utf-8'))
 
 
+@_impl_check
 def sg_get_num_nomult(buf):
     return libsgutils2.sg_get_num_nomult(buf.encode('utf-8'))
 
 
+@_impl_check
 def sg_get_llnum(buf):
     return libsgutils2.sg_get_llnum(buf.encode('utf-8'))
 
 
+@_impl_check
 def sg_set_text_mode(fd):
     if hasattr(fd, 'fileno'):
         fd_ = fd.fileno()
@@ -836,6 +877,7 @@ def sg_set_text_mode(fd):
         raise OSError(err_no, libc.strerror(err_no).decode('utf-8'))
 
 
+@_impl_check
 def sg_set_binary_mode(fd):
     if hasattr(fd, 'fileno'):
         fd_ = fd.fileno()

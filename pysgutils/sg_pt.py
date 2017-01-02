@@ -17,8 +17,7 @@ import ctypes
 import enum
 import errno
 import sys
-from . import sg_lib
-from . import libsgutils2
+from . import sg_lib, libsgutils2, _impl_check
 
 
 class SGPTBase(ctypes.c_void_p):
@@ -38,6 +37,7 @@ def scsi_pt_version():
     return libsgutils2.scsi_pt_version().decode('utf-8')
 
 
+@_impl_check
 def scsi_pt_open_device(device_name, read_only=False, verbose=False):
     """Returns >= 0 if successful. If error in Unix returns negated errno."""
     ret = libsgutils2.scsi_pt_open_device(device_name.encode('utf-8'), read_only, verbose)
@@ -46,6 +46,7 @@ def scsi_pt_open_device(device_name, read_only=False, verbose=False):
     return ret
 
 
+@_impl_check
 def scsi_pt_open_flags(device_name, flags=os.O_RDWR, verbose=False):
     """Similar to scsi_pt_open_device() but takes Unix style open flags OR-ed
     together. Returns valid file descriptor( >= 0 ) if successful, otherwise
@@ -57,6 +58,7 @@ def scsi_pt_open_flags(device_name, flags=os.O_RDWR, verbose=False):
     return ret
 
 
+@_impl_check
 def scsi_pt_close_device(device_fd):
     """Returns 0 if successful. If error in Unix returns negated errno."""
     ret = libsgutils2.scsi_pt_close_device(device_fd)
@@ -64,6 +66,7 @@ def scsi_pt_close_device(device_fd):
         raise OSError(-ret, sg_lib.safe_strerror(-ret))
 
 
+@_impl_check
 def construct_scsi_pt_obj():
     """Creates an object that can be used to issue one or more SCSI commands
     (or task management functions). Returns NULL if problem.
@@ -76,45 +79,54 @@ def construct_scsi_pt_obj():
         return SGPTBase(ret)
 
 
+@_impl_check
 def clear_scsi_pt_obj(objp):
     """Clear state information held in *objp . This allows this object to be
     used to issue more than one SCSI command."""
     libsgutils2.clear_scsi_pt_obj(objp)
 
 
+@_impl_check
 def set_scsi_pt_cdb(objp, cdb):
     """Set the CDB (command descriptor block)"""
     libsgutils2.set_scsi_pt_cdb(objp, cdb, len(cdb))
 
 
+@_impl_check
 def set_scsi_pt_sense(objp, sense):
     """Set the sense buffer and the maximum length that it can handle"""
     libsgutils2.set_scsi_pt_sense(objp, sense, len(sense))
 
 
+@_impl_check
 def set_scsi_pt_data_in(objp, dxferp):
     """Set a pointer and length to be used for data transferred from device"""
     libsgutils2.set_scsi_pt_data_in(objp, dxferp, len(dxferp))
 
 
+@_impl_check
 def set_scsi_pt_data_out(objp, dxferp):
     """Set a pointer and length to be used for data transferred to device"""
     libsgutils2.set_scsi_pt_data_out(objp, dxferp, len(dxferp))
 
 
+@_impl_check
 def set_scsi_pt_packet_id(objp, packet_id):
     """The following "set_"s implementations may be dummies"""
     libsgutils2.set_scsi_pt_packet_id(objp, packet_id)
 
 
+@_impl_check
 def set_scsi_pt_tag(objp, tag):
     libsgutils2.set_scsi_pt_tag(objp, tag)
 
 
+@_impl_check
 def set_scsi_pt_task_management(objp, tmf_code):
     libsgutils2.set_scsi_pt_task_management(objp, tmf_code)
 
 
+@_impl_check
 def set_scsi_pt_task_attr(objp, attribute, priority):
     libsgutils2.set_scsi_pt_task_attr(objp, attribute, priority)
 
@@ -129,12 +141,14 @@ class SCSIPTFlags(enum.IntEnum):
     QUEUE_AT_HEAD = 0x20
 
 
+@_impl_check
 def set_scsi_pt_flags(objp, flags):
     """Set (potentially OS dependant) flags for pass-through mechanism.
     Apart from contradictions, flags can be OR-ed together."""
     libsgutils2.set_scsi_pt_flags(objp, flags)
 
 
+@_impl_check
 def do_scsi_pt(objp, fd, timeout_secs, verbose=False):
     """If OS error prior to or during command submission then returns negated
     error value (e.g. Unix '-errno'). This includes interrupted system calls
@@ -164,50 +178,59 @@ class SCSIPTResult(enum.IntEnum):
     OS_ERR = 4
 
 
+@_impl_check
 def get_scsi_pt_result_category(objp):
     """highest numbered applicable category returned"""
     return SCSIPTResult(libsgutils2.get_scsi_pt_result_category(objp))
 
 
+@_impl_check
 def get_scsi_pt_resid(objp):
     """If not available return 0"""
     return libsgutils2.get_scsi_pt_resid(objp)
 
 
+@_impl_check
 def get_scsi_pt_status_response(objp):
     """Returns SCSI status value (from device that received the
     command)."""
     return sg_lib.SCSIStatusCode(libsgutils2.get_scsi_pt_status_response(objp))
 
 
+@_impl_check
 def get_scsi_pt_sense_len(objp):
     """Actual sense length returned. If sense data is present but
     actual sense length is not known, return 'max_sense_len'"""
     return libsgutils2.get_scsi_pt_sense_len(objp)
 
 
+@_impl_check
 def get_scsi_pt_os_err(objp):
     """If not available return 0"""
     return libsgutils2.get_scsi_pt_os_err(objp)
 
 
+@_impl_check
 def get_scsi_pt_os_err_str(objp):
     buffer = ctypes.create_string_buffer(512)
     libsgutils2.get_scsi_pt_os_err_str(objp, 512, ctypes.byref(buffer))
     return buffer.value.decode('utf-8')
 
 
+@_impl_check
 def get_scsi_pt_transport_err(objp):
     """If not available return 0"""
     return libsgutils2.get_scsi_pt_transport_err(objp)
 
 
+@_impl_check
 def get_scsi_pt_transport_err_str(objp):
     buffer = ctypes.create_string_buffer(512)
     libsgutils2.get_scsi_pt_transport_err_str(objp, 512, ctypes.byref(buffer))
     return buffer.value.decode('utf-8')
 
 
+@_impl_check
 def get_scsi_pt_duration_ms(objp):
     """If not available return -1"""
     ret = libsgutils2.get_scsi_pt_duration_ms(objp)
@@ -217,6 +240,7 @@ def get_scsi_pt_duration_ms(objp):
         return ret
 
 
+@_impl_check
 def destruct_scsi_pt_obj(objp):
     """Should be invoked once per objp after other processing is complete in
     order to clean up resources. For ever successful construct_scsi_pt_obj()
@@ -224,6 +248,7 @@ def destruct_scsi_pt_obj(objp):
     libsgutils2.destruct_scsi_pt_obj(objp)
 
 
+@_impl_check
 def scsi_pt_win32_direct(objp, state_direct):
     """Request SPT direct interface when state_direct is 1, state_direct set
     to 0 for the SPT indirect interface. Default setting selected by build
@@ -234,6 +259,7 @@ def scsi_pt_win32_direct(objp, state_direct):
         pass
 
 
+@_impl_check
 def scsi_pt_win32_spt_state():
     try:
         return libsgutils2.scsi_pt_win32_spt_state() != 0

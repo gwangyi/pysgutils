@@ -5,6 +5,17 @@ libsgutils2 = None
 libc = None
 
 
+def _impl_check(f):
+    def not_implemented(*args, **kwargs):
+        raise NotImplementedError(f.__name__)
+
+    if hasattr(libsgutils2, f.__name__):
+        return f
+    else:
+        not_implemented.__name__ = f.__name__
+        return not_implemented
+
+
 def _load(libsgutils2_path, libc_path):
     global libsgutils2, libc
 
