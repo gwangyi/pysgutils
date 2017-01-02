@@ -1,8 +1,13 @@
 import ctypes
 from . import os
 
+libsgutils2 = None
+libc = None
+
 
 def _load(libsgutils2_path, libc_path):
+    global libsgutils2, libc
+
     libsgutils2 = ctypes.CDLL(libsgutils2_path)
     libc = ctypes.CDLL(libc_path)
     
@@ -45,11 +50,6 @@ def _load(libsgutils2_path, libc_path):
         stderr = libc._fdopen(2, b'w')
     libc.setbuf(stdout, None)
     libc.setbuf(stderr, None)
-
-    from . import sg_lib, sg_pt
-    sg_lib.libsgutils2 = libsgutils2
-    sg_lib.libc = libc
-    sg_pt.libsgutils2 = libsgutils2
 
 
 def _autoload():

@@ -18,8 +18,7 @@ import enum
 import errno
 import sys
 from . import sg_lib
-
-libsgutils2 = None
+from . import libsgutils2
 
 
 class SGPTBase(ctypes.c_void_p):

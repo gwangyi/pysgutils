@@ -31,9 +31,7 @@ import six
 import ctypes
 import struct
 import enum
-
-libsgutils2 = None
-libc = None
+from . import libsgutils2, libc
 
 
 @six.python_2_unicode_compatible
