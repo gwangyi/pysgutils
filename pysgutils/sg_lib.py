@@ -347,8 +347,12 @@ def sg_get_sense_str(leadin, sense, raw_sinfo):
     else:
         leadin_ = leadin.encode('utf-8')
     buff = ctypes.create_string_buffer(2048)
+    # In some version of sg3_utils, sg_get_sense_str returns void, not the length of returned string
     ret = libsgutils2.sg_get_sense_str(leadin_, sense, len(sense), raw_sinfo, 2048, ctypes.byref(buff))
-    return buff[:ret].decode('utf-8')
+    if ret == 0:
+        return buff.value.decode('utf-8')
+    else:
+        return buff[:ret].decode('utf-8')
 
 
 @_impl_check
