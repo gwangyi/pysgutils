@@ -31,7 +31,41 @@ import six
 import ctypes
 import struct
 import enum
+import threading
 from . import libsgutils2, libc, _impl_check
+
+_thread_store = threading.local()
+
+
+def _get_buffer(size):
+    if size == 0:
+        return None
+    if not hasattr(_thread_store, 'buffer'):
+        if size < 4096:
+            size_ = 4096
+        else:
+            size_ = size
+        _thread_store.buffer = ctypes.create_string_buffer(size_)
+    elif size > ctypes.sizeof(_thread_store.buffer):
+        ctypes.resize(_thread_store.buffer, size)
+    return (ctypes.c_char * size).from_buffer(_thread_store.buffer)
+
+
+def _copy_buffer(data):
+    if not data:
+        return None
+    size = len(data)
+    if not hasattr(_thread_store, 'buffer'):
+        if size < 4096:
+            size_ = 4096
+        else:
+            size_ = size
+        _thread_store.buffer = ctypes.create_string_buffer(size_)
+    elif size > ctypes.sizeof(_thread_store.buffer):
+        ctypes.resize(_thread_store.buffer, size)
+    ctypes.memmove(_thread_store.buffer, data, size)
+    return (ctypes.c_char * size).from_buffer(_thread_store.buffer)
+
 
 
 @six.python_2_unicode_compatible
@@ -156,7 +190,7 @@ def sg_get_command_name(cdb, peri_type):
     depend on peripheral type (give 0 or -1 if unknown). Places command
     name into buff and will write no more than buff_len bytes.
     """
-    buff = ctypes.create_string_buffer(128)
+    buff = _get_buffer(128)
     libsgutils2.sg_get_command_name(cdb, peri_type, 128, ctypes.byref(buff))
     return buff.value.decode('utf-8')
 
@@ -171,7 +205,7 @@ def sg_get_opcode_name(cdb_byte0, peri_type):
         cdb_byte0_ = cdb_byte0
     else:
         cdb_byte0_ = cdb_byte0[0]
-    buff = ctypes.create_string_buffer(80)
+    buff = _get_buffer(80)
     libsgutils2.sg_get_opcode_name(cdb_byte0_, peri_type, 80, ctypes.byref(buff))
     return buff.value.decode('utf-8')
 
@@ -186,7 +220,7 @@ def sg_get_opcode_sa_name(cdb_byte0, service_action, peri_type):
         cdb_byte0_ = cdb_byte0
     else:
         cdb_byte0_ = cdb_byte0[0]
-    buff = ctypes.create_string_buffer(128)
+    buff = _get_buffer(128)
     libsgutils2.sg_get_opcode_sa_name(cdb_byte0_, service_action, peri_type, 128, ctypes.byref(buff))
     return buff.value.decode('utf-8')
 
@@ -194,7 +228,7 @@ def sg_get_opcode_sa_name(cdb_byte0, service_action, peri_type):
 @_impl_check
 def sg_get_scsi_status_str(scsi_status):
     """ Fetch scsi status string. """
-    buff = ctypes.create_string_buffer(128)
+    buff = _get_buffer(128)
     libsgutils2.sg_get_scsi_status_str(scsi_status, 128, ctypes.byref(buff))
     return buff.value.decode('utf-8')
 
@@ -230,7 +264,7 @@ def sg_scsi_normalize_sense(sense):
     that structure. sshp::additional_length is always 0 for response
     codes 0x70 and 0x71 (fixed format).
     """
-    buff = ctypes.create_string_buffer(8)
+    buff = _get_buffer(8)
     ret = libsgutils2.sg_scsi_normalize_sense(sense, len(sense), ctypes.byref(buff))
     if ret == 0:
         return None
@@ -247,8 +281,8 @@ def sg_scsi_sense_desc_find(sense, desc_type):
     given 'desc_type'. If found return pointer to start of sense data
     descriptor; otherwise (including fixed format sense data) returns NULL.
     """
-    buffer = ctypes.create_string_buffer(sense)
-    ret = libsgutils2.sg_scsi_sense_desc_find(sense, len(sense), desc_type)
+    buffer = _copy_buffer(sense)
+    ret = libsgutils2.sg_scsi_sense_desc_find(buffer, len(buffer), desc_type)
     if ret == 0:
         return None
     else:
@@ -274,7 +308,7 @@ def sg_get_sense_key(sense):
 @_impl_check
 def sg_get_sense_key_str(sense_key):
     """ Yield string associated with sense_key value. Returns 'buff'. """
-    buff = ctypes.create_string_buffer(80)
+    buff = _get_buffer(80)
     libsgutils2.sg_get_sense_key_str(sense_key, 80, ctypes.byref(buff))
     return buff.value.decode('utf-8')
 
@@ -282,7 +316,7 @@ def sg_get_sense_key_str(sense_key):
 @_impl_check
 def sg_get_asc_ascq_str(asc, ascq):
     """ Yield string associated with ASC/ASCQ values. Returns 'buff'. """
-    buff = ctypes.create_string_buffer(128)
+    buff = _get_buffer(128)
     libsgutils2.sg_get_asc_ascq_str(asc, ascq, 128, ctypes.byref(buff))
     return buff.value.decode('utf-8')
 
@@ -346,7 +380,7 @@ def sg_get_sense_str(leadin, sense, raw_sinfo):
         leadin_ = None
     else:
         leadin_ = leadin.encode('utf-8')
-    buff = ctypes.create_string_buffer(2048)
+    buff = _get_buffer(2048)
     # In some version of sg3_utils, sg_get_sense_str returns void, not the length of returned string
     ret = libsgutils2.sg_get_sense_str(leadin_, sense, len(sense), raw_sinfo, 2048, ctypes.byref(buff))
     if ret == 0:
@@ -367,7 +401,7 @@ def sg_get_sense_descriptors_str(leadin, sense):
         leadin_ = None
     else:
         leadin_ = leadin.encode('utf-8')
-    buff = ctypes.create_string_buffer(2048)
+    buff = _get_buffer(2048)
     ret = libsgutils2.sg_get_sense_descriptors_str(leadin_, sense, len(sense), 2048, ctypes.byref(buff))
     return buff[:ret].decode('utf-8')
 
@@ -385,7 +419,7 @@ def sg_get_designation_descriptor_str(leadin, ddp, print_assoc=False, do_long=Fa
         leadin_ = None
     else:
         leadin_ = leadin.encode('utf-8')
-    buff = ctypes.create_string_buffer(2048)
+    buff = _get_buffer(2048)
     ret = libsgutils2.sg_get_designation_descriptor_str(leadin_, ddp, len(ddp),
                                                         print_assoc, do_long, 2048, ctypes.byref(buff))
     return buff[:ret].decode('utf-8')
@@ -397,7 +431,7 @@ def sg_get_pdt_str(pdt):
     Yield string associated with peripheral device type (pdt). Returns
     'buff'. If 'pdt' out of range yields "bad pdt" string.
     """
-    buff = ctypes.create_string_buffer(48)
+    buff = _get_buffer(48)
     libsgutils2.sg_get_pdt_str(pdt, 48, ctypes.byref(buff))
     return buff.value.decode('utf-8')
 
@@ -420,7 +454,7 @@ def sg_get_trans_proto_str(tpi):
     Yield string associated with transport protocol identifier (tpi). Returns
     'buff'. If 'tpi' out of range yields "bad tpi" string.
     """
-    buff = ctypes.create_string_buffer(128)
+    buff = _get_buffer(128)
     libsgutils2.sg_get_trans_proto_str(tpi, 128, ctypes.byref(buff))
     return buff.value.decode('utf-8')
 
@@ -436,7 +470,7 @@ def sg_decode_transportid_str(leadin, bp, only_one=True):
         leadin_ = None
     else:
         leadin_ = leadin.encode('utf-8')
-    buff = ctypes.create_string_buffer(1024)
+    buff = _get_buffer(1024)
     bp_ = bytes(bp)
     libsgutils2.sg_decode_transportid_str(leadin_, bp_, len(bp_), only_one, 1024, ctypes.byref(buff))
     return buff.value
@@ -693,7 +727,7 @@ def sg_get_category_sense_str(sense_cat, verbose=False):
     to "Bad sense category" if 'buff' is NULL). If sense_cat unknown then
     yield "Sense category: <sense_cat>" string.
     """
-    buff = ctypes.create_string_buffer(80)
+    buff = _get_buffer(80)
     libsgutils2.sg_get_category_sense_str(sense_cat, 80, ctypes.byref(buff), verbose)
     return buff.value.decode('utf-8')
 
@@ -791,7 +825,7 @@ def dStrHexStr(str, leadin=None, format=StrHexFormat.WithAscii):
     number of bytes written to 'b' excluding the trailing '\0'
     """
     str_ = bytes(str)
-    buff = ctypes.create_string_buffer(len(str_) * 10)
+    buff = _get_buffer(len(str_) * 10)
     if leadin is None:
         leadin_ = None
     else:
@@ -822,7 +856,7 @@ def sg_ata_get_chars(word_arr, is_big_endian=None):
         is_big_endian = sg_is_big_endian()
     word_arr_ = struct.pack("{}H".format(len(word_arr)), *word_arr)
 
-    buff = ctypes.create_string_buffer(len(word_arr_))
+    buff = _get_buffer(len(word_arr_))
     ret = libsgutils2.sg_ata_get_chars(word_arr_, 0, len(word_arr), is_big_endian, ctypes.byref(buff))
 
     return buff[:ret].decode('utf-8')
