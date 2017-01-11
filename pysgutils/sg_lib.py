@@ -32,6 +32,7 @@ import ctypes
 import struct
 import enum
 import threading
+from . import Buffer
 from . import libsgutils2, libc, _impl_check
 
 _thread_store = threading.local()
@@ -252,6 +253,14 @@ class SCSISenseHdr:
         self.byte6 = byte6
         self.additional_length = additional_length
 
+    @staticmethod
+    def from_sense(sense):
+        return sg_scsi_normalize_sense(sense)
+
+    @property
+    def asc_ascq(self):
+        return sg_get_asc_ascq_str(self.asc, self.ascq)
+
 
 @_impl_check
 def sg_scsi_normalize_sense(sense):
@@ -281,12 +290,19 @@ def sg_scsi_sense_desc_find(sense, desc_type):
     given 'desc_type'. If found return pointer to start of sense data
     descriptor; otherwise (including fixed format sense data) returns NULL.
     """
-    buffer = _copy_buffer(sense)
+    try:
+        if hasattr(sense, '_as_parameter_'):
+            sense = sense._as_parameter_
+        start = ctypes.addressof(sense)
+        buffer = sense
+    except TypeError:
+        buffer = _copy_buffer(sense)
+        start = ctypes.sizeof(buffer)
     ret = libsgutils2.sg_scsi_sense_desc_find(buffer, len(buffer), desc_type)
     if ret == 0:
         return None
     else:
-        return sense[ret - ctypes.addressof(buffer):]
+        return sense[ret - start:]
 
 
 @_impl_check
@@ -845,7 +861,7 @@ def sg_is_big_endian():
 
 
 @_impl_check
-def sg_ata_get_chars(word_arr, is_big_endian=None):
+def sg_ata_get_chars(word_arr, start_word=0, num_words=None, is_big_endian=None):
     """
     Extract character sequence from ATA words as in the model string
     in a IDENTIFY DEVICE response. Returns number of characters
@@ -854,12 +870,18 @@ def sg_ata_get_chars(word_arr, is_big_endian=None):
     """
     if is_big_endian is None:
         is_big_endian = sg_is_big_endian()
-    word_arr_ = struct.pack("{}H".format(len(word_arr)), *word_arr)
+
+    if isinstance(word_arr, (list, tuple)):
+        word_arr_ = struct.pack("{}H".format(len(word_arr)), *word_arr)
+    else:
+        word_arr_ = bytes(word_arr)
+    if num_words is None:
+        num_words = len(word_arr_) // 2
 
     buff = _get_buffer(len(word_arr_))
-    ret = libsgutils2.sg_ata_get_chars(word_arr_, 0, len(word_arr), is_big_endian, ctypes.byref(buff))
+    ret = libsgutils2.sg_ata_get_chars(word_arr_, start_word, num_words, is_big_endian, ctypes.byref(buff))
 
-    return buff[:ret].decode('utf-8')
+    return buff[:ret]
 
 
 @_impl_check
@@ -928,3 +950,111 @@ def sg_set_binary_mode(fd):
     if ret < 0:
         err_no = -ret
         raise OSError(err_no, libc.strerror(err_no).decode('utf-8'))
+
+
+@six.python_2_unicode_compatible
+class SCSICommand(bytes):
+    def __new__(cls, seq, peri_type=PeripheralDeviceTypes.DISK, service_action=None):
+        obj = super(SCSICommand, cls).__new__(cls, seq)
+        return obj
+
+    def __init__(self, seq, peri_type=PeripheralDeviceTypes.DISK, service_action=None):
+        super(SCSICommand, self).__init__()
+        if service_action is None:
+            if self[0] == 0x7f:
+                service_action = int.from_bytes(self[8:10], 'big')
+            else:
+                service_action = self[1] & 0x1f
+        self._peri_type = PeripheralDeviceTypes(peri_type)
+        self.service_action = service_action
+
+    @property
+    def size(self):
+        return sg_get_command_size(self[0])
+
+    @property
+    def name(self):
+        return sg_get_command_name(self, self.peri_type)
+
+    @property
+    def opcode_name(self):
+        return sg_get_opcode_name(self, self.peri_type)
+
+    @property
+    def opcode_sa_name(self):
+        return sg_get_opcode_sa_name(self, self.service_action, self.peri_type)
+
+    @property
+    def peri_type(self):
+        return self._peri_type
+
+    @peri_type.setter
+    def peri_type(self, val):
+        self._peri_type = PeripheralDeviceTypes(val)
+
+    def __str__(self):
+        return "{}: {}".format(self.name, ' '.join('{:02x}'.format(n) for n in self))
+
+    def __repr__(self):
+        return "<{}: {}>".format(type(self).__qualname__, str(self))
+
+
+@six.python_2_unicode_compatible
+class SCSISense(Buffer):
+    def __init__(self, init, size=None):
+        super(SCSISense, self).__init__(init, size)
+        self.header = SCSISenseHdr.from_sense(self)
+        self._dirty = False
+
+    def find_desc(self, desc_type):
+        return sg_scsi_sense_desc_find(self, desc_type)
+
+    def update_header(self):
+        self.header = SCSISenseHdr.from_sense(self)
+
+    @property
+    def sense_key(self):
+        return sg_get_sense_key(self)
+
+    @property
+    def asc_ascq_str(self):
+        return sg_get_asc_ascq_str(self.header.asc, self.header.ascq)
+
+    @property
+    def info(self):
+        valid, info = sg_get_sense_info_fld(self)
+        return info if valid else None
+
+    @property
+    def filemark_eom_ili(self):
+        return sg_get_sense_filemark_eom_ili(self)
+
+    @property
+    def filemark(self):
+        return self.filemark_eom_ili[1]
+
+    @property
+    def eom(self):
+        return self.filemark_eom_ili[2]
+
+    @property
+    def ili(self):
+        return self.filemark_eom_ili[3]
+
+    @property
+    def progress(self):
+        return sg_get_sense_progress_fld(self)
+
+    def __str__(self):
+        return sg_get_sense_str('', self, False)
+
+    def __repr__(self):
+        return "<{}: {}>".format(type(self).__qualname__, sg_get_sense_str('', self, True))
+
+    @property
+    def descriptors(self):
+        return sg_get_sense_descriptors_str('', self)
+
+    @property
+    def err_category(self):
+        return sg_err_category_sense(self)

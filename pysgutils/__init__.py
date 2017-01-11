@@ -16,6 +16,33 @@ def _impl_check(f):
         return not_implemented
 
 
+class Buffer(object):
+    def __init__(self, init, size=None):
+        self._buffer = ctypes.create_string_buffer(init, size)
+        self._as_parameter_ = self._buffer
+
+    def resize(self, size):
+        if size > ctypes.sizeof(self._buffer):
+            ctypes.resize(self._buffer, size)
+        self._as_parameter_ = (ctypes.c_char * size).from_buffer(self._buffer)
+        return self
+
+    def __len__(self):
+        return len(self._as_parameter_)
+
+    def __getitem__(self, item):
+        return self._as_parameter_[item]
+
+    def __setitem__(self, key, value):
+        self._as_parameter_[key] = value
+
+    def __iter__(self):
+        return iter(self._as_parameter_)
+
+    def __bytes__(self):
+        return bytes(self._as_parameter_)
+
+
 def _load(libsgutils2_path, libc_path):
     global libsgutils2, libc
 

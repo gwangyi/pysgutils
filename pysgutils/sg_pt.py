@@ -17,7 +17,10 @@ import ctypes
 import enum
 import errno
 import sys
+import six
+import weakref
 from . import sg_lib, libsgutils2, _impl_check
+
 
 
 class SGPTBase(ctypes.c_void_p):
@@ -136,6 +139,7 @@ class SCSIPTFlags(enum.IntEnum):
     present. Older versions of this library may not have this function.
     If neither QUEUE_AT_HEAD nor QUEUE_AT_TAIL are given, or both
     are given, use the pass-through default."""
+    NONE = 0
     FUNCTION = 1
     QUEUE_AT_TAIL = 0x10
     QUEUE_AT_HEAD = 0x20
@@ -265,3 +269,206 @@ def scsi_pt_win32_spt_state():
         return libsgutils2.scsi_pt_win32_spt_state() != 0
     except AttributeError:
         pass
+
+
+class SCSIPTDevice(object):
+    _refs = weakref.WeakValueDictionary()
+    _stack = [None]
+
+    def __init__(self, device_name, read_only_or_flags=False, verbose=False, **kwargs):
+        if 'flags' in kwargs:
+            read_only_or_flags = kwargs['flags']
+        elif 'read_only' in kwargs:
+            read_only_or_flags = kwargs['read_only']
+
+        if isinstance(read_only_or_flags, bool):
+            self._fd = scsi_pt_open_device(device_name, read_only_or_flags, verbose)
+        elif isinstance(read_only_or_flags, six.integer_types):
+            self._fd = scsi_pt_open_flags(device_name, read_only_or_flags, verbose)
+        else:
+            raise ValueError("read_only_or_flags must be one of bool or integer value")
+
+        self.device_name = device_name
+        self._refs[id(self)] = self
+
+    def __repr__(self):
+        return "<{}: {}, fd: {}>".format(type(self).__qualname__, self.device_name, self._fd)
+
+    def __del__(self):
+        if self._fd is not None:
+            self.close()
+
+    def close(self):
+        scsi_pt_close_device(self._fd)
+        self._fd = None
+
+    def enter(self):
+        self._stack.append(self)
+
+    def exit(self):
+        self._stack.pop()
+
+    @classmethod
+    def current(cls):
+        return cls._stack[-1]
+
+    def __enter__(self):
+        return self.enter()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        return self.exit()
+
+
+class SCSIPTObject(object):
+    _refs = weakref.WeakValueDictionary()
+    timeout = 5
+
+    class TaskAttr(object):
+        def __init__(self, pt_obj):
+            self._pt_obj = pt_obj
+            self._attrs = dict()
+
+        def __getitem__(self, item):
+            return self._attrs.get(item, None)
+
+        def __setitem__(self, key, value):
+            set_scsi_pt_task_attr(self._pt_obj, key, value)
+            self._attrs[key] = value
+
+    def __init__(self):
+        self._pt_obj = construct_scsi_pt_obj()
+        self._cdb = None
+        self._sense = None
+        self._data_in = None
+        self._data_out = None
+        self._packet_id = None
+        self._tag = None
+        self._task_management = None
+        self.task_attr = self.TaskAttr(self._pt_obj)
+        self._flags = SCSIPTFlags.NONE
+        self._win32_direct = scsi_pt_win32_spt_state()
+        self._refs[id(self)] = self
+
+    def clear(self):
+        clear_scsi_pt_obj(self._pt_obj)
+
+    def __del__(self):
+        destruct_scsi_pt_obj(self._pt_obj)
+
+    @property
+    def cdb(self):
+        return self._cdb
+
+    @cdb.setter
+    def cdb(self, val):
+        set_scsi_pt_cdb(self._pt_obj, val)
+        self._cdb = sg_lib.SCSICommand(bytes(val))
+
+    @property
+    def sense(self):
+        return self._sense
+
+    @sense.setter
+    def sense(self, val):
+        set_scsi_pt_sense(self._pt_obj, val)
+        self._sense = val
+
+    @property
+    def data_in(self):
+        return self._data_in
+
+    @data_in.setter
+    def data_in(self, val):
+        set_scsi_pt_data_in(self._pt_obj, val)
+        self._data_in = val
+
+    @property
+    def data_out(self):
+        return self._data_out
+
+    @data_out.setter
+    def data_out(self, val):
+        set_scsi_pt_data_out(self._pt_obj, val)
+        self._data_out = val
+
+    @property
+    def packet_id(self):
+        return self._packet_id
+
+    @packet_id.setter
+    def packet_id(self, val):
+        set_scsi_pt_packet_id(self._pt_obj, val)
+        self._packet_id = val
+
+    @property
+    def tag(self):
+        return self._tag
+
+    @tag.setter
+    def tag(self, val):
+        set_scsi_pt_tag(self._pt_obj, val)
+        self._tag = val
+
+    @property
+    def task_management(self):
+        return self._task_management
+
+    @task_management.setter
+    def task_management(self, val):
+        set_scsi_pt_task_management(self._pt_obj, val)
+        self._task_management = val
+
+    @property
+    def result_category(self):
+        return get_scsi_pt_result_category(self._pt_obj)
+
+    @property
+    def resid(self):
+        return get_scsi_pt_resid(self._pt_obj)
+
+    @property
+    def status_response(self):
+        return get_scsi_pt_status_response(self._pt_obj)
+
+    @property
+    def sense_len(self):
+        return get_scsi_pt_sense_len(self._pt_obj)
+
+    @property
+    def os_err(self):
+        return get_scsi_pt_os_err(self._pt_obj)
+
+    @property
+    def os_err_str(self):
+        return get_scsi_pt_os_err_str(self._pt_obj)
+
+    @property
+    def transport_err(self):
+        return get_scsi_pt_transport_err(self._pt_obj)
+
+    @property
+    def transport_err_str(self):
+        return get_scsi_pt_transport_err_str(self._pt_obj)
+
+    @property
+    def duration_ms(self):
+        return get_scsi_pt_duration_ms(self._pt_obj)
+
+    @property
+    def win32_direct(self):
+        return self._win32_direct
+
+    @win32_direct.setter
+    def win32_direct(self, val):
+        scsi_pt_win32_direct(self._pt_obj, val)
+        self._win32_direct = val
+
+    def do_scsi_pt(self, timeout=None, device=None, verbose=False):
+        if device is None:
+            device = SCSIPTDevice.current()
+        if device is None:
+            raise ValueError("Device is not specified")
+        if timeout is None:
+            timeout = self.timeout
+        do_scsi_pt(self._pt_obj, device._fd, timeout, verbose)
+        return self.result_category

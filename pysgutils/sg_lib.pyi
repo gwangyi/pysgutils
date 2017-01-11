@@ -1,4 +1,5 @@
-from typing import *
+from typing import Union, Optional, Tuple, List, Iterable
+from . import Buffer
 import enum
 
 class PeripheralDeviceTypes(enum.IntEnum):
@@ -49,10 +50,10 @@ class SCSISenseHdr:
 def sg_scsi_normalize_sense(sense: bytes) -> SCSISenseHdr:
     ...
 
-def sg_scsi_sense_desc_find(sense: bytes, desc_type: int) -> bytes:
+def sg_scsi_sense_desc_find(sense: Union[bytes, Buffer], desc_type: int) -> bytes:
     ...
 
-def sg_get_sense_key(sense: bytes) -> Union[SCSISenseKeyCode, int]:
+def sg_get_sense_key(sense: Union[bytes, Buffer]) -> Union[SCSISenseKeyCode, int]:
     ...
 
 def sg_get_sense_key_str(sense_key: SCSISenseKeyCode) -> str:
@@ -61,19 +62,19 @@ def sg_get_sense_key_str(sense_key: SCSISenseKeyCode) -> str:
 def sg_get_asc_ascq_str(asc: int, ascq: int) -> str:
     ...
 
-def sg_get_sense_info_fld(sense: bytes) -> Tuple[bool, int]:
+def sg_get_sense_info_fld(sense: Union[bytes, Buffer]) -> Tuple[bool, int]:
     ...
 
-def sg_get_sense_filemark_eom_ili(sense: bytes) -> Tuple[bool, bool, bool, bool]:
+def sg_get_sense_filemark_eom_ili(sense: Union[bytes, Buffer]) -> Tuple[bool, bool, bool, bool]:
     ...
 
-def sg_get_sense_progress_fld(sense: bytes) -> Tuple[bool, int]:
+def sg_get_sense_progress_fld(sense: Union[bytes, Buffer]) -> Tuple[bool, int]:
     ...
 
-def sg_get_sense_str(leadin: Optional[str], sense: bytes, raw_sinfo: bool) -> str:
+def sg_get_sense_str(leadin: Optional[str], sense: Union[bytes, Buffer], raw_sinfo: bool) -> str:
     ...
 
-def sg_get_sense_descriptors_str(leadin: Optional[str], sense: bytes) -> str:
+def sg_get_sense_descriptors_str(leadin: Optional[str], sense: Union[bytes, Buffer]) -> str:
     ...
 
 def sg_get_designation_descriptor_str(leadin: Optional[str], ddp: bytes,
@@ -128,7 +129,7 @@ class SGLibErrorCode(enum.IntEnum):
 class SGLibCategory(enum.IntEnum):
     ...
 
-def sg_err_category_sense(sense_buffer: bytes) -> SGLibCategory:
+def sg_err_category_sense(sense_buffer: Union[bytes, Buffer]) -> SGLibCategory:
     ...
 
 def sg_get_category_sense_str(sense_cat: SGLibCategory, verbose: bool=False) -> str:
@@ -157,7 +158,8 @@ def dStrHexStr(str: bytes, leadin: Optional[str]=None, format:StrHexFormat=StrHe
 def sg_is_big_endian() -> bool:
     ...
 
-def sg_ata_get_chars(word_arr: List[int], is_big_endian: Optional[bool]=None) -> str:
+def sg_ata_get_chars(word_arr: Optional[bytes, List[int]], start_word: int=0, num_words: Optional[int]=None,
+                     is_big_endian=None) -> bytes:
     ...
 
 def dWordHex(words: List[int], no_ascii: StrHexFormat=StrHexFormat.WithAscii, swapb: Optional[bool]=None):
