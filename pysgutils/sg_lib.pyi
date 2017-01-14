@@ -1,5 +1,5 @@
 from typing import Union, Optional, Tuple, List, Iterable
-from . import Buffer
+from . import Buffer, AlignedBuffer
 import enum
 
 class PeripheralDeviceTypes(enum.IntEnum):
@@ -22,13 +22,13 @@ def sg_lib_version() -> str:
 def sg_get_command_size(cdb_byte0: Union[int, bytes]) -> int:
     ...
 
-def sg_get_command_name(cdb: bytes, peri_type: PeripheralDeviceTypes) -> str:
+def sg_get_command_name(cdb: Union[bytes, Buffer], peri_type: PeripheralDeviceTypes) -> str:
     ...
 
-def sg_get_opcode_name(cdb_byte0: Union[int, bytes], peri_type: PeripheralDeviceTypes) -> str:
+def sg_get_opcode_name(cdb_byte0: Union[int, bytes, Buffer], peri_type: PeripheralDeviceTypes) -> str:
     ...
 
-def sg_get_opcode_sa_name(cdb_byte0: Union[int, bytes], service_action: int, peri_type: PeripheralDeviceTypes) -> str:
+def sg_get_opcode_sa_name(cdb_byte0: Union[int, bytes, Buffer], service_action: int, peri_type: PeripheralDeviceTypes) -> str:
     ...
 
 def sg_get_scsi_status_str(scsi_status: SCSIStatusCode) -> str:
@@ -45,6 +45,10 @@ class SCSISenseHdr:
         self.byte5 = byte5
         self.byte6 = byte6
         self.additional_length = additional_length
+
+    @staticmethod
+    def from_sense(sense: Union[bytes, Buffer]) -> 'SCSISenseHdr':
+        ...
 
 
 def sg_scsi_normalize_sense(sense: bytes) -> SCSISenseHdr:
@@ -179,3 +183,90 @@ def sg_set_text_mode(fd):
 
 def sg_set_binary_mode(fd):
     ...
+
+class SCSICommand(AlignedBuffer):
+    alignment = 64
+
+    def __init__(self, seq: Union[bytes, Iterable[int]], peri_type: PeripheralDeviceTypes=PeripheralDeviceTypes.DISK,
+                 service_action: Optional[int]=None):
+        super().__init__(seq)
+        self.service_action = service_action
+
+    @property
+    def size(self) -> int:
+        return 0
+
+    @property
+    def name(self) -> str:
+        return ''
+
+    @property
+    def opcode_name(self) -> str:
+        return ''
+
+    @property
+    def opcode_sa_name(self) -> str:
+        return ''
+
+    @property
+    def peri_type(self) -> PeripheralDeviceTypes:
+        return PeripheralDeviceTypes.DISK
+
+    @peri_type.setter
+    def peri_type(self, val: PeripheralDeviceTypes):
+        ...
+
+
+class SCSISense(AlignedBuffer):
+    alignment = 64
+
+    def __init__(self, init, size=None):
+        super(SCSISense, self).__init__(init, size)
+        self.header = SCSISenseHdr.from_sense(self)
+        self._dirty = False
+
+    def find_desc(self, desc_type: int) -> bytes:
+        ...
+
+    def update_header(self) -> None:
+        ...
+
+    @property
+    def sense_key(self) -> SCSISenseKeyCode:
+        return SCSISenseKeyCode.NO_SENSE_CODE
+
+    @property
+    def asc_ascq_str(self) -> str:
+        return ''
+
+    @property
+    def info(self) -> Optional[int]:
+        return None
+
+    @property
+    def filemark_eom_ili(self) -> Tuple[bool, bool, bool, bool]:
+        return False, False, False, False
+
+    @property
+    def filemark(self) -> bool:
+        return False
+
+    @property
+    def eom(self) -> bool:
+        return False
+
+    @property
+    def ili(self) -> bool:
+        return False
+
+    @property
+    def progress(self) -> Optional[int]:
+        return None
+
+    @property
+    def descriptors(self) -> str:
+        return ''
+
+    @property
+    def err_category(self) -> SGLibCategory:
+        return SGLibCategory.CLEAN

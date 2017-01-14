@@ -1,4 +1,5 @@
 import ctypes
+import six
 from . import os
 
 libsgutils2 = None
@@ -18,12 +19,16 @@ def _impl_check(f):
 
 class Buffer(object):
     def __init__(self, init, size=None):
+        if not isinstance(init, (six.integer_types, bytes)):
+            init = bytes(init)
+            size = len(init)
         self._buffer = ctypes.create_string_buffer(init, size)
         self._as_parameter_ = self._buffer
 
     def resize(self, size):
         if size > ctypes.sizeof(self._buffer):
             ctypes.resize(self._buffer, size)
+        # noinspection PyUnresolvedReferences
         self._as_parameter_ = (ctypes.c_char * size).from_buffer(self._buffer)
         return self
 
@@ -41,6 +46,53 @@ class Buffer(object):
 
     def __bytes__(self):
         return bytes(self._as_parameter_)
+
+
+class AlignedBuffer(Buffer):
+    alignment = None
+
+    # noinspection PySuperArguments
+    def __init__(self, init, size=None, alignment=None):
+        if alignment is None:
+            alignment = self.alignment
+        self._alignment = alignment
+        if alignment is None:
+            super(AlignedBuffer, self).__init__(init, size)
+        else:
+            if isinstance(init, six.integer_types):
+                size = init
+                init = b''
+            elif size is None:
+                if isinstance(init, bytes):
+                    init = init
+                    size = len(init) + 1
+                else:
+                    init = bytes(init)
+                    size = len(init)
+            super(AlignedBuffer, self).__init__(size + alignment)
+            self._as_parameter_ = self._align(self._buffer, size, alignment)
+            ctypes.memmove(self._as_parameter_, init, min(len(init), size))
+
+    @staticmethod
+    def _align(buffer, size, alignment):
+        if alignment & (alignment - 1) != 0:
+            raise ValueError("Alignment must be a power of 2")
+        address = ctypes.addressof(buffer)
+        offset = alignment - (address & (alignment - 1))
+        # noinspection PyUnresolvedReferences
+        return (ctypes.c_char * size).from_buffer(buffer, offset)
+
+    def resize(self, size):
+        if self._alignment is None:
+            return super(AlignedBuffer, self).resize(size)
+        previous_aligned_buffer = self._as_parameter_
+        previous_unaligned_buffer_address = ctypes.addressof(self._buffer)
+        super(AlignedBuffer, self).resize(size + self._alignment)
+        self._as_parameter_ = self._align(self._buffer, size, self._alignment)
+        if ctypes.addressof(self._as_parameter_) != ctypes.addressof(previous_aligned_buffer):
+            if ctypes.addressof(self._as_parameter_) - ctypes.addressof(self._buffer) != \
+                    ctypes.addressof(previous_aligned_buffer) - previous_unaligned_buffer_address:
+                ctypes.memmove(self._as_parameter_, previous_aligned_buffer, len(previous_aligned_buffer))
 
 
 def _load(libsgutils2_path, libc_path):

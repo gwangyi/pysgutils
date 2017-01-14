@@ -32,7 +32,7 @@ import ctypes
 import struct
 import enum
 import threading
-from . import Buffer
+from . import AlignedBuffer
 from . import libsgutils2, libc, _impl_check
 
 _thread_store = threading.local()
@@ -953,18 +953,17 @@ def sg_set_binary_mode(fd):
 
 
 @six.python_2_unicode_compatible
-class SCSICommand(bytes):
-    def __new__(cls, seq, peri_type=PeripheralDeviceTypes.DISK, service_action=None):
-        obj = super(SCSICommand, cls).__new__(cls, seq)
-        return obj
+class SCSICommand(AlignedBuffer):
+    alignment = 64
 
+    # noinspection PySuperArguments
     def __init__(self, seq, peri_type=PeripheralDeviceTypes.DISK, service_action=None):
-        super(SCSICommand, self).__init__()
+        super(SCSICommand, self).__init__(seq)
         if service_action is None:
-            if self[0] == 0x7f:
+            if int.from_bytes(self[0], 'big') == 0x7f:
                 service_action = int.from_bytes(self[8:10], 'big')
             else:
-                service_action = self[1] & 0x1f
+                service_action = int.from_bytes(self[1], 'big') & 0x1f
         self._peri_type = PeripheralDeviceTypes(peri_type)
         self.service_action = service_action
 
@@ -993,14 +992,17 @@ class SCSICommand(bytes):
         self._peri_type = PeripheralDeviceTypes(val)
 
     def __str__(self):
-        return "{}: {}".format(self.name, ' '.join('{:02x}'.format(n) for n in self))
+        return "{}: {}".format(self.name, ' '.join('{:02x}'.format(int.from_bytes(n, 'big')) for n in self))
 
     def __repr__(self):
         return "<{}: {}>".format(type(self).__qualname__, str(self))
 
 
 @six.python_2_unicode_compatible
-class SCSISense(Buffer):
+class SCSISense(AlignedBuffer):
+    alignment = 64
+
+    # noinspection PySuperArguments
     def __init__(self, init, size=None):
         super(SCSISense, self).__init__(init, size)
         self.header = SCSISenseHdr.from_sense(self)
@@ -1043,7 +1045,8 @@ class SCSISense(Buffer):
 
     @property
     def progress(self):
-        return sg_get_sense_progress_fld(self)
+        valid, progress = sg_get_sense_progress_fld(self)
+        return progress if valid else None
 
     def __str__(self):
         return sg_get_sense_str('', self, False)

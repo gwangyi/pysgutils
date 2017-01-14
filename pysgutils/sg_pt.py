@@ -22,7 +22,6 @@ import weakref
 from . import sg_lib, libsgutils2, _impl_check
 
 
-
 class SGPTBase(ctypes.c_void_p):
     """
     This declaration hides the fact that each implementation has its own
@@ -346,7 +345,10 @@ class SCSIPTObject(object):
         self._task_management = None
         self.task_attr = self.TaskAttr(self._pt_obj)
         self._flags = SCSIPTFlags.NONE
-        self._win32_direct = scsi_pt_win32_spt_state()
+        try:
+            self._win32_direct = scsi_pt_win32_spt_state()
+        except NotImplementedError:
+            self._win32_direct = None
         self._refs[id(self)] = self
 
     def clear(self):
@@ -362,7 +364,10 @@ class SCSIPTObject(object):
     @cdb.setter
     def cdb(self, val):
         set_scsi_pt_cdb(self._pt_obj, val)
-        self._cdb = sg_lib.SCSICommand(bytes(val))
+        if isinstance(val, sg_lib.SCSICommand):
+            self._cdb = val
+        else:
+            self._cdb = sg_lib.SCSICommand(bytes(val))
 
     @property
     def sense(self):
