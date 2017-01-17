@@ -270,6 +270,17 @@ def scsi_pt_win32_spt_state():
         pass
 
 
+class TransportError(RuntimeError):
+    def __init__(self, err, message):
+        super().__init__("[Error {}] {}".format(err, message))
+
+
+class SCSIError(RuntimeError):
+    def __init__(self, result_category, message):
+        super().__init__("[SCSI Status {}] {}".format(message))
+        self.result_category = result_category
+
+
 class SCSIPTDevice(object):
     _refs = weakref.WeakValueDictionary()
     _stack = [None]
@@ -476,4 +487,11 @@ class SCSIPTObject(object):
         if timeout is None:
             timeout = self.timeout
         do_scsi_pt(self._pt_obj, device._fd, timeout, verbose)
+        if self.os_err:
+            raise OSError(self.os_err, self.os_err_str)
+        if self.transport_err:
+            raise TransportError(self.transport_err, self.transport_err_str)
+
+        if self.result_category != sg_lib.SCSIStatusCode.GOOD:
+            raise SCSIError(self.result_category, '')
         return self.result_category
