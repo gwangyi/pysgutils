@@ -958,7 +958,7 @@ class SCSICommand(AlignedBuffer):
 
     # noinspection PySuperArguments
     def __init__(self, seq, peri_type=PeripheralDeviceTypes.DISK, service_action=None):
-        super(SCSICommand, self).__init__(seq)
+        super(SCSICommand, self).__init__(seq, len(seq))
         if service_action is None:
             if int.from_bytes(self[0], 'big') == 0x7f:
                 service_action = int.from_bytes(self[8:10], 'big')
@@ -966,6 +966,13 @@ class SCSICommand(AlignedBuffer):
                 service_action = int.from_bytes(self[1], 'big') & 0x1f
         self._peri_type = PeripheralDeviceTypes(peri_type)
         self.service_action = service_action
+
+    @classmethod
+    def build(cls, fmt, *args, **kwargs):
+        peri_type = kwargs.get('peri_type', PeripheralDeviceTypes.DISK)
+        service_action = kwargs.get('service_action', None)
+        cdb = struct.pack(">" + fmt, *args)
+        return cls(cdb, peri_type, service_action)
 
     @property
     def size(self):
