@@ -128,6 +128,16 @@ class SCSIPTDevice(object):
         ...
 
 
+class TransportError(RuntimeError):
+    def __init__(self, err: int, message: str):
+        ...
+
+
+class SCSIError(RuntimeError):
+    def __init__(self, status_code: sg_lib.SCSIStatusCode, message: str):
+        ...
+
+
 class SCSIPTObject(object):
     _refs = weakref.WeakValueDictionary()
     timeout = 5

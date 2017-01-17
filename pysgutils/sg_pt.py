@@ -276,9 +276,9 @@ class TransportError(RuntimeError):
 
 
 class SCSIError(RuntimeError):
-    def __init__(self, result_category, message):
-        super().__init__("[SCSI Status {}] {}".format(message))
-        self.result_category = result_category
+    def __init__(self, status_code, message):
+        super().__init__("[SCSI Status {}] {}".format(status_code, message))
+        self.status_code = status_code
 
 
 class SCSIPTDevice(object):
@@ -487,11 +487,14 @@ class SCSIPTObject(object):
         if timeout is None:
             timeout = self.timeout
         do_scsi_pt(self._pt_obj, device._fd, timeout, verbose)
-        if self.os_err:
-            raise OSError(self.os_err, self.os_err_str)
-        if self.transport_err:
-            raise TransportError(self.transport_err, self.transport_err_str)
 
-        if self.result_category != sg_lib.SCSIStatusCode.GOOD:
-            raise SCSIError(self.result_category, '')
-        return self.result_category
+        result = self.result_category
+
+        if result == SCSIPTResult.OS_ERR or self.os_err:
+            raise OSError(self.os_err, self.os_err_str)
+        elif result == SCSIPTResult.TRANSPORT_ERR or self.transport_err:
+            raise TransportError(self.transport_err, self.transport_err_str)
+        elif result == SCSIPTResult.SENSE:
+            raise SCSIError(self.status_response, str(self.sense))
+        elif result == SCSIPTResult.STATUS:
+            raise SCSIError(self.status_response, '')
